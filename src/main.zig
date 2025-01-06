@@ -6,6 +6,9 @@ const io = std.io;
 const mem = std.mem;
 const os = std.os.linux;
 
+var gameInit: *const fn (*usize, *fs.File, *usize, *usize) *App = undefined;
+var gameRender: *const fn (*App) void = undefined;
+var gameHandleInput: *const fn (*App, u8) void = undefined;
 var gameReload: *const fn (*App) void = undefined;
 
 /// Represent the size of the window to render into
@@ -45,7 +48,7 @@ pub fn main() !void {
     loadGameDll() catch @panic("Failed to load game.so");
 
     // TODO this suck how do you not make a messy state in Zig
-    var app_state = App.init(&i, &tty, &size.width, &size.height);
+    const app_state = gameInit(&i, &tty, &size.width, &size.height);
 
     while (!app_state.quit) {
         if (app_state.reload) {
@@ -57,11 +60,11 @@ pub fn main() !void {
             gameReload(app_state);
         }
 
-        app_state.render();
+        gameRender(app_state);
 
         var buffer: [1]u8 = undefined;
         _ = try tty.read(&buffer); // this example driven by read, this blocks until next key press??
-        app_state.handle_input(buffer[0]);
+        gameHandleInput(app_state, buffer[0]);
     }
 }
 
@@ -170,6 +173,9 @@ fn loadGameDll() !void {
     };
     // TODO should I not do defer dyn_lib.close()
     game_dyn_lib = dyn_lib;
+    gameInit = dyn_lib.lookup(@TypeOf(gameInit), "gameInit") orelse return error.LookupFail;
+    gameRender = dyn_lib.lookup(@TypeOf(gameRender), "gameRender") orelse return error.LookupFail;
+    gameHandleInput = dyn_lib.lookup(@TypeOf(gameHandleInput), "gameHandleInput") orelse return error.LookupFail;
     gameReload = dyn_lib.lookup(@TypeOf(gameReload), "gameReload") orelse return error.LookupFail;
 }
 
