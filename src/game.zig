@@ -7,7 +7,6 @@ pub const GameState = struct {
     width: *usize = undefined,
     height: *usize = undefined,
     quit: bool = false,
-    reload: bool = false,
 };
 
 export fn gameInit(i: *usize, tty: *fs.File, width: *usize, height: *usize) *GameState {
@@ -26,7 +25,7 @@ export fn gameRender(self: *GameState) void {
     const writer = self.tty.writer();
     writeLine(writer, "foo", 0, self.width.*, self.i.* == 0);
     writeLine(writer, "bar", 1, self.width.*, self.i.* == 1);
-    writeLine(writer, "baz", 2, self.width.*, self.i.* == 2);
+    writeLine(writer, "baz22", 2, self.width.*, self.i.* == 2);
     writeLine(writer, "xyzzy", 3, self.width.*, self.i.* == 3);
 }
 
@@ -37,7 +36,6 @@ export fn gameHandleInput(self: *GameState, buffer: u8) void {
         'q' => self.quit = true,
         'j' => self.i.* = @min(self.i.* + 1, 3),
         'k' => self.i.* -|= 1,
-        'r' => self.reload = true,
 
         // '\x1b' => { // handle esc like alt key, we want to check if ther are more bytes in buffer
         //     // dont block waiting for bytes but return right away, we just want to know if there is more in the buffer
@@ -66,7 +64,7 @@ export fn gameHandleInput(self: *GameState, buffer: u8) void {
 
 /// Do any update logic that need to be done after each hot reload
 export fn gameReload(self: *GameState) void {
-    self.reload = false;
+    _ = self;
 }
 
 fn writeLine(writer: anytype, txt: []const u8, y: usize, width: usize, selected: bool) void {

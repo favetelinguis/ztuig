@@ -1,4 +1,5 @@
 const std = @import("std");
+const watch = @import("watcher.zig");
 const App = @import("game.zig").GameState;
 const debug = std.debug;
 const fs = std.fs;
@@ -47,25 +48,27 @@ pub fn main() !void {
 
     loadGameDll() catch @panic("Failed to load game.so");
 
+    // setup file watch for hot reaload
+    var watcher = try watch.Watcher.init(allocator);
+    defer watcher.deinit();
+    try watcher.addFile("src/game.zig");
+    watcher.setCallback(callback);
+    _ = try std.Thread.spawn(.{}, watcherThread, .{&watcher});
+
     // TODO this suck how do you not make a messy state in Zig
     const app_state = gameInit(&i, &tty, &size.width, &size.height);
 
     while (!app_state.quit) {
-        if (app_state.reload) {
-            unloadGameDll() catch unreachable;
-            recompileGameDll(allocator) catch {
-                std.debug.print("Failed to recompile game.dll\n", .{});
-            };
-            loadGameDll() catch @panic("Failed to load game.dll");
-            gameReload(app_state);
-        }
-
         gameRender(app_state);
 
         var buffer: [1]u8 = undefined;
         _ = try tty.read(&buffer); // this example driven by read, this blocks until next key press??
         gameHandleInput(app_state, buffer[0]);
     }
+
+    // shut down the watcher
+    // TODO not sure how to use this
+    // thread.join();
 }
 
 /// Puts the termios object into raw mode and have the ability to customize how to do wait for input
@@ -205,6 +208,23 @@ fn recompileGameDll(allocator: std.mem.Allocator) !void {
         },
         else => return,
     }
+}
+
+fn callback(allocator: std.mem.Allocator, event: watch.Event) void {
+    switch (event) {
+        .modified => {
+            unloadGameDll() catch unreachable;
+            recompileGameDll(allocator) catch {
+                std.debug.print("Failed to recompile game.dll\n", .{});
+            };
+            loadGameDll() catch @panic("Failed to load game.dll");
+            // might also have to call reloadeGame here but not sure how to do that atm
+        },
+    }
+}
+
+fn watcherThread(watcher: *watch.Watcher) !void {
+    try watcher.start();
 }
 
 test "simple test" {
