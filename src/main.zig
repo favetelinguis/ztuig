@@ -1,4 +1,6 @@
 const std = @import("std");
+const app = @import("game.zig");
+const App = @import("game.zig").GameState;
 const debug = std.debug;
 const fs = std.fs;
 const io = std.io;
@@ -11,9 +13,9 @@ const Size = struct { width: usize, height: usize };
 
 var i: usize = 0;
 var size: Size = undefined;
+var tty: fs.File = undefined;
 var cooked_termios: os.termios = undefined; // represent the original state before raw mode
 var raw: os.termios = undefined;
-var tty: fs.File = undefined;
 
 /// My app need to handle 5 input channels
 /// writing/reading escape sequences, termios, ioctl, signals
@@ -37,57 +39,15 @@ pub fn main() !void {
         .flags = 0,
     }, null);
 
-    // var original: os.termios = undefined;
-    // _ = std.os.os.tcgetattr(tty.handle, &original);
+    var app_state = App.init(&i, &tty, &size.width, &size.height);
 
-    // set the raw mode
-    // var raw = original;
-    // cfmakeraw(&raw, false, true);
-
-    // todo user posix.errno used on return here to make real errors in zig, switch on the errno, check term lib for the pattern
-    // flush will clean upp anythin in the input buffer
-    // _ = os.tcsetattr(tty.handle, .FLUSH, &raw);
-    // defer _ = os.tcsetattr(tty.handle, .FLUSH, &original);
-
-    while (true) {
-        try render();
+    while (!app_state.quit) {
+        app_state.render();
 
         var buffer: [1]u8 = undefined;
         _ = try tty.read(&buffer); // this example driven by read, this blocks until next key press??
 
-        switch (buffer[0]) {
-            'q' => return,
-            '\x1b' => { // handle esc like alt key, we want to check if ther are more bytes in buffer
-                // dont block waiting for bytes but return right away, we just want to know if there is more in the buffer
-                cfmakeraw(&raw, true, false);
-                // .now so we dont flush what is left in the buffer
-                _ = os.tcsetattr(tty.handle, .NOW, &raw);
-
-                // try to read remaining bytes, i guess 8 bytes is the maximum long an esc sequence can be
-                var esc_buffer: [8]u8 = undefined;
-                const esc_read = try tty.read(&esc_buffer);
-
-                // restore we once again block until new bytes arrive in the input
-                cfmakeraw(&raw, false, true);
-                _ = os.tcsetattr(tty.handle, .NOW, &raw);
-
-                if (mem.eql(u8, esc_buffer[0..esc_read], "[A")) {
-                    i -|= 1;
-                } else if (mem.eql(u8, esc_buffer[0..esc_read], "[B")) {
-                    i = @min(i + 1, 3);
-                }
-
-                // if (esc_read == 0) {
-                //     std.log.debug("input: escape\r\n", .{});
-                // } else if (std.mem.eql(u8, esc_buffer[0..esc_read], "[A")) {
-                //     std.log.debug("input: arrow up\r\n", .{});
-                // } else {
-                //     std.log.debug("input: unknown escape sequence\r\n", .{});
-                // }
-            },
-            // '\n', '\r' => std.log.debug("input: return\r\n", .{}),
-            else => unreachable, //std.log.debug("input: {} {s}\r\n", .{ buffer[0], buffer }),
-        }
+        app_state.handle_input(buffer[0]);
     }
 }
 
@@ -143,12 +103,6 @@ fn cook() !void {
     _ = os.tcsetattr(tty.handle, .FLUSH, &cooked_termios);
 }
 
-/// Use zero based movement of cursor
-fn moveCursor(writer: anytype, row: usize, col: usize) !void {
-    // CSI for cursor position CUP
-    _ = try writer.print("\x1B[{};{}H", .{ row + 1, col + 1 });
-}
-
 fn clear(writer: anytype) !void {
     try writer.writeAll("\x1B[2J");
 }
@@ -191,30 +145,7 @@ fn getSize() !Size {
 
 fn handleSigWinch(_: c_int) callconv(.C) void {
     size = getSize() catch return;
-    render() catch return;
-}
-
-fn render() !void {
-    const writer = tty.writer();
-    try writeLine(writer, "foo", 0, size.width, i == 0);
-    try writeLine(writer, "bar", 1, size.width, i == 1);
-    try writeLine(writer, "baz", 2, size.width, i == 2);
-    try writeLine(writer, "xyzzy", 3, size.width, i == 3);
-}
-
-fn blueBackground(writer: anytype) !void {
-    try writer.writeAll("\x1B[44m");
-}
-
-fn writeLine(writer: anytype, txt: []const u8, y: usize, width: usize, selected: bool) !void {
-    if (selected) {
-        try blueBackground(writer);
-    } else {
-        try attributeReset(writer);
-    }
-    try moveCursor(writer, y, 0);
-    try writer.writeAll(txt);
-    try writer.writeByteNTimes(' ', width - txt.len);
+    // render() catch return; // TODO how the hell to do this when i move render.
 }
 
 test "simple test" {
