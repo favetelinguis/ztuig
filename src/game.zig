@@ -18,4 +18,6 @@ pub export fn gameTick(game_state_ptr: *GameState) void {
 
 pub export fn gameDraw(game_state_ptr: *GameState) void {
     _ = game_state_ptr;
+
+    std.debug.print("2222This is an updated version\n", .{});
 }

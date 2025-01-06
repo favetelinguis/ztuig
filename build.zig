@@ -38,6 +38,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main2.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true, //remove in future https://ziggit.dev/t/code-reloading-error-general-protection-exception-no-address-available/7707/4
         });
 
         // This declares intent for the executable to be installed into the
