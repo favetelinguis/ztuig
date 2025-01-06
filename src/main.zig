@@ -69,6 +69,8 @@ pub fn main() !void {
     // shut down the watcher
     // TODO not sure how to use this
     // thread.join();
+    // should i not use
+    // thread.detach();
 }
 
 /// Puts the termios object into raw mode and have the ability to customize how to do wait for input
