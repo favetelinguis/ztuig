@@ -1,11 +1,12 @@
 const std = @import("std");
-const app = @import("game.zig");
 const App = @import("game.zig").GameState;
 const debug = std.debug;
 const fs = std.fs;
 const io = std.io;
 const mem = std.mem;
 const os = std.os.linux;
+
+var gameReload: *const fn (*App) void = undefined;
 
 /// Represent the size of the window to render into
 // TODO is this in chars or in pixels
@@ -21,6 +22,8 @@ var raw: os.termios = undefined;
 /// writing/reading escape sequences, termios, ioctl, signals
 /// SIGWINCH is used to signal window changed size
 pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
     // Get a file handler to this terminals tty
     tty = try fs.openFileAbsolute("/dev/tty", .{ .mode = .read_write });
     defer tty.close();
@@ -39,14 +42,25 @@ pub fn main() !void {
         .flags = 0,
     }, null);
 
+    loadGameDll() catch @panic("Failed to load game.so");
+
+    // TODO this suck how do you not make a messy state in Zig
     var app_state = App.init(&i, &tty, &size.width, &size.height);
 
     while (!app_state.quit) {
+        if (app_state.reload) {
+            unloadGameDll() catch unreachable;
+            recompileGameDll(allocator) catch {
+                std.debug.print("Failed to recompile game.dll\n", .{});
+            };
+            loadGameDll() catch @panic("Failed to load game.dll");
+            gameReload(app_state);
+        }
+
         app_state.render();
 
         var buffer: [1]u8 = undefined;
         _ = try tty.read(&buffer); // this example driven by read, this blocks until next key press??
-
         app_state.handle_input(buffer[0]);
     }
 }
@@ -146,6 +160,45 @@ fn getSize() !Size {
 fn handleSigWinch(_: c_int) callconv(.C) void {
     size = getSize() catch return;
     // render() catch return; // TODO how the hell to do this when i move render.
+}
+
+var game_dyn_lib: ?std.DynLib = null;
+fn loadGameDll() !void {
+    if (game_dyn_lib != null) return error.AlreadyLoaded;
+    var dyn_lib = std.DynLib.open("zig-out/lib/libgame.so") catch {
+        return error.OpenFail;
+    };
+    // TODO should I not do defer dyn_lib.close()
+    game_dyn_lib = dyn_lib;
+    gameReload = dyn_lib.lookup(@TypeOf(gameReload), "gameReload") orelse return error.LookupFail;
+}
+
+fn unloadGameDll() !void {
+    if (game_dyn_lib) |*dyn_lib| {
+        dyn_lib.close();
+        game_dyn_lib = null;
+    } else {
+        return error.AlreadyUnloaded;
+    }
+}
+
+fn recompileGameDll(allocator: std.mem.Allocator) !void {
+    const process_args = [_][]const u8{
+        "zig",
+        "build",
+        "-Dgame_only=true",
+    };
+    var build_process = std.process.Child.init(&process_args, allocator);
+    try build_process.spawn();
+    // wait() returns a tagged union. If the compilations fails that union
+    // will be in the state .{ .Exited = 2 }
+    const term = try build_process.wait();
+    switch (term) {
+        .Exited => |exited| {
+            if (exited == 2) return error.RecompileFail;
+        },
+        else => return,
+    }
 }
 
 test "simple test" {

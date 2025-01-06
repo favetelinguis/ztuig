@@ -7,6 +7,7 @@ pub const GameState = struct {
     width: *usize = undefined,
     height: *usize = undefined,
     quit: bool = false,
+    reload: bool = false,
 
     pub fn init(i: *usize, tty: *fs.File, width: *usize, height: *usize) *GameState {
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -35,6 +36,8 @@ pub const GameState = struct {
             'q' => self.quit = true,
             'j' => self.i.* = @min(self.i.* + 1, 3),
             'k' => self.i.* -|= 1,
+            'r' => self.reload = true,
+
             // '\x1b' => { // handle esc like alt key, we want to check if ther are more bytes in buffer
             //     // dont block waiting for bytes but return right away, we just want to know if there is more in the buffer
             //     cfmakeraw(&raw, true, false);
@@ -58,6 +61,11 @@ pub const GameState = struct {
             // '\n', '\r' => std.log.debug("input: return\r\n", .{}),
             else => unreachable, //std.log.debug("input: {} {s}\r\n", .{ buffer[0], buffer }),
         }
+    }
+
+    /// Do any update logic that need to be done after each hot reload
+    pub fn update(self: *GameState) void {
+        self.reload = false;
     }
 };
 
@@ -86,10 +94,7 @@ fn moveCursor(writer: anytype, row: usize, col: usize) void {
     _ = writer.print("\x1B[{};{}H", .{ row + 1, col + 1 }) catch @panic("Failure writing");
 }
 
-pub export fn gameReload(game_state_ptr: *GameState) void {
-    _ = game_state_ptr;
-}
-
-pub export fn gameTick(game_state_ptr: *GameState) void {
-    _ = game_state_ptr;
+// Only exported function
+export fn gameReload(game_state_ptr: *GameState) void {
+    game_state_ptr.update();
 }

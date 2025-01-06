@@ -1,2 +1,2 @@
 rerun: 
-    zig build run2 -Dgame_only=false
+    zig build run -Dgame_only=false
