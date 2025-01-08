@@ -1,4 +1,5 @@
 const std = @import("std");
+const wez = @import("wezterm.zig");
 const fs = std.fs;
 
 pub const GameState = struct {
@@ -25,7 +26,7 @@ export fn gameRender(self: *GameState) void {
     const writer = self.tty.writer();
     writeLine(writer, "foo", 0, self.width.*, self.i.* == 0);
     writeLine(writer, "bar", 1, self.width.*, self.i.* == 1);
-    writeLine(writer, "baz22", 2, self.width.*, self.i.* == 2);
+    writeLine(writer, "baz", 2, self.width.*, self.i.* == 2);
     writeLine(writer, "xyzzy", 3, self.width.*, self.i.* == 3);
 }
 
@@ -34,6 +35,7 @@ export fn gameRender(self: *GameState) void {
 export fn gameHandleInput(self: *GameState, buffer: u8) void {
     switch (buffer) {
         'q' => self.quit = true,
+        's' => wez.run() catch @panic("Failure running chile process"),
         'j' => self.i.* = @min(self.i.* + 1, 3),
         'k' => self.i.* -|= 1,
 

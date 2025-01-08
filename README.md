@@ -10,6 +10,10 @@
 Things to try for TUI:
  - Use query instead of terminfo, take inspiration from libvaxis 
  - Use the Kitty keyboard protocol instead to read keypresses. Well documented!
+ - I want a server client architecture the terminal should handle all window splitting etc.
+ - I want to use the terminal as editor could a use a projectional editor for treesitter, project the tresitter ast directry to the terminal?
+ - Try this also in wezterm, might be better for my type of development where i want sessions?
+
 
 Things to try for code reload:
  - Add an option to buil with static which will not be hotreloaded. See github link they do that.

@@ -21,6 +21,7 @@ pub fn build(b: *std.Build) void {
         .name = "game",
         .root_source_file = b.path("src/game.zig"),
         .target = target,
+        .link_libc = true, // needed to spawn child processes
         .optimize = optimize,
         // .version = .{ .major = 1, .minor = 0, .patch = 0 },
     });
